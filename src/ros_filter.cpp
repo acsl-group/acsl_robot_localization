@@ -842,19 +842,20 @@ namespace RobotLocalization
                    "must not match the map_frame or odom_frame.");
 
     // Try to resolve tf_prefix
-    std::string tfPrefix = "";
+    // std::string tfPrefix = "";
+    tf_prefix_ = "";
     std::string tfPrefixPath = "";
     if (nhLocal_.searchParam("tf_prefix", tfPrefixPath))
     {
-      nhLocal_.getParam(tfPrefixPath, tfPrefix);
+      nhLocal_.getParam(tfPrefixPath, tf_prefix_);
     }
 
     // Append the tf prefix in a tf2-friendly manner
-    FilterUtilities::appendPrefix(tfPrefix, mapFrameId_);
-    FilterUtilities::appendPrefix(tfPrefix, odomFrameId_);
-    FilterUtilities::appendPrefix(tfPrefix, baseLinkFrameId_);
-    FilterUtilities::appendPrefix(tfPrefix, baseLinkOutputFrameId_);
-    FilterUtilities::appendPrefix(tfPrefix, worldFrameId_);
+    FilterUtilities::appendPrefix(tf_prefix_, mapFrameId_);
+    FilterUtilities::appendPrefix(tf_prefix_, odomFrameId_);
+    FilterUtilities::appendPrefix(tf_prefix_, baseLinkFrameId_);
+    FilterUtilities::appendPrefix(tf_prefix_, baseLinkOutputFrameId_);
+    FilterUtilities::appendPrefix(tf_prefix_, worldFrameId_);
 
     // Whether we're publshing the world_frame->base_link_frame transform
     nhLocal_.param("publish_tf", publishTransform_, true);
@@ -1025,7 +1026,7 @@ namespace RobotLocalization
     nh_.getParam("/silent_tf_failure", tfSilentFailure_);
 
     // Debugging writes to file
-    RF_DEBUG("tf_prefix is " << tfPrefix <<
+    RF_DEBUG("tf_prefix is " << tf_prefix_ <<
              "\nmap_frame is " << mapFrameId_ <<
              "\nodom_frame is " << odomFrameId_ <<
              "\nbase_link_frame is " << baseLinkFrameId_ <<
@@ -2671,7 +2672,24 @@ namespace RobotLocalization
     {
       // Otherwise, we should use our target frame
       finalTargetFrame = targetFrame;
-      poseTmp.frame_id_ = (differential && !imuData ? finalTargetFrame : msg->header.frame_id);
+
+      // poseTmp.frame_id_ = (differential && !imuData ? finalTargetFrame : msg->header.frame_id);
+      if (!imuData) {
+        if (differential) {
+          poseTmp.frame_id_ = finalTargetFrame;
+        } else {
+          poseTmp.frame_id_ = msg->header.frame_id;
+        }
+      } else {
+        poseTmp.frame_id_ = msg->header.frame_id;
+        FilterUtilities::appendPrefix(tf_prefix_, poseTmp.frame_id_);
+      }
+      // ROS_WARN_STREAM_THROTTLE(
+      //     5,
+      //     "differential: " << differential << ", imuData: " << imuData
+      //                      << ", finalTargetFrame: " << finalTargetFrame
+      //                      << ", msg->header.frame_id: " << msg->header.frame_id
+      //                      << ", poseTmp.frame_id_: " << poseTmp.frame_id_);
     }
 
     RF_DEBUG("Final target frame for " << topicName << " is " << finalTargetFrame << "\n");

@@ -760,6 +760,8 @@ template<class T> class RosFilter
     //! @brief optional signaling diagnostic frequency
     //!
     std::unique_ptr<diagnostic_updater::HeaderlessTopicDiagnostic> freqDiag_;
+
+    std::string tf_prefix_;
 };
 
 }  // namespace RobotLocalization
