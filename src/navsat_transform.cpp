@@ -116,6 +116,14 @@ namespace RobotLocalization
     from_ll_srv_ = nh.advertiseService("fromLL", &NavSatTransform::fromLLCallback, this);
     set_utm_zone_srv_ = nh.advertiseService("setUTMZone", &NavSatTransform::setUTMZoneCallback, this);
 
+    // Try to resolve tf_prefix
+    // std::string tf_prefix = "";
+    tf_prefix_ = "";
+    std::string tf_prefix_path = "";
+    if (nh_priv.searchParam("tf_prefix", tf_prefix_path)) {
+      nh_priv.getParam(tf_prefix_path, tf_prefix_);
+    }
+
     if (use_manual_datum_ && nh_priv.hasParam("datum"))
     {
       XmlRpc::XmlRpcValue datum_config;
@@ -144,17 +152,9 @@ namespace RobotLocalization
         std::istringstream istr(ostr.str());
         istr >> datum_lat >> datum_lon >> datum_yaw;
 
-        // Try to resolve tf_prefix
-        std::string tf_prefix = "";
-        std::string tf_prefix_path = "";
-        if (nh_priv.searchParam("tf_prefix", tf_prefix_path))
-        {
-          nh_priv.getParam(tf_prefix_path, tf_prefix);
-        }
-
         // Append the tf prefix in a tf2-friendly manner
-        FilterUtilities::appendPrefix(tf_prefix, world_frame_id_);
-        FilterUtilities::appendPrefix(tf_prefix, base_link_frame_id_);
+        FilterUtilities::appendPrefix(tf_prefix_, world_frame_id_);
+        FilterUtilities::appendPrefix(tf_prefix_, base_link_frame_id_);
 
         robot_localization::SetDatum::Request request;
         request.geo_pose.position.latitude = datum_lat;
@@ -513,6 +513,10 @@ namespace RobotLocalization
                                                     tf2::Transform &robot_cartesian_pose,
                                                     const ros::Time &transform_time)
   {
+    // ROS_WARN_STREAM_THROTTLE(
+    //     2.0, "getRobotOriginCartesianPose, base_link_frame_id_: "
+    //              << base_link_frame_id_
+    //              << ", gps_frame_id_: " << gps_frame_id_);
     robot_cartesian_pose.setIdentity();
 
     // Get linear offset from origin for the GPS
@@ -564,6 +568,14 @@ namespace RobotLocalization
                                                 tf2::Transform &robot_odom_pose,
                                                 const ros::Time &transform_time)
   {
+    // ROS_WARN_STREAM_THROTTLE(2.0,
+    //                          "getRobotOriginWorldPose, base_link_frame_id_: "
+    //                              << base_link_frame_id_
+    //                              << ", gps_frame_id_: " << gps_frame_id_);
+    // ROS_WARN_STREAM_THROTTLE(2.0,
+    //                          "getRobotOriginWorldPose, world_frame_id_: "
+    //                              << world_frame_id_
+    //                              << ", base_link_frame_id_: " << base_link_frame_id_); 
     robot_odom_pose.setIdentity();
 
     // Remove the offset from base_link
@@ -611,6 +623,11 @@ namespace RobotLocalization
   void NavSatTransform::gpsFixCallback(const sensor_msgs::NavSatFixConstPtr& msg)
   {
     gps_frame_id_ = msg->header.frame_id;
+    FilterUtilities::appendPrefix(tf_prefix_, gps_frame_id_);
+
+    // ROS_WARN_STREAM_THROTTLE(
+    //     2.0, "DEBUG, tf_prefix_: " << tf_prefix_
+    //                                << ", gps_frame_id_: " << gps_frame_id_);
 
     if (gps_frame_id_.empty())
     {
@@ -687,10 +704,16 @@ namespace RobotLocalization
       tf2::fromMsg(msg->orientation, transform_orientation_);
 
       // Correct for the IMU's orientation w.r.t. base_link
+      std::string tf_prefix_base_link = msg->header.frame_id;
+      FilterUtilities::appendPrefix(tf_prefix_, tf_prefix_base_link);
+      // ROS_WARN_STREAM_THROTTLE(
+      //     2.0, "imuCallback, base_link_frame_id_: "
+      //              << base_link_frame_id_ << ", tf_prefix_base_link: "
+      //              << tf_prefix_base_link << ", tf_prefix_: " << tf_prefix_);
       tf2::Transform target_frame_trans;
       bool can_transform = RosFilterUtilities::lookupTransformSafe(tf_buffer_,
                                                                    base_link_frame_id_,
-                                                                   msg->header.frame_id,
+                                                                   tf_prefix_base_link,
                                                                    msg->header.stamp,
                                                                    transform_timeout_,
                                                                    target_frame_trans,

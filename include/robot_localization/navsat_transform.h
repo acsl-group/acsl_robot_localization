@@ -375,6 +375,8 @@ class NavSatTransform
     //! @brief Used for publishing the static world_frame->cartesian transform
     //!
     tf2_ros::StaticTransformBroadcaster cartesian_broadcaster_;
+
+    std::string tf_prefix_;
 };
 
 }  // namespace RobotLocalization
